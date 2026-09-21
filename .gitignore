@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+
+# YOLO model weights
+*.pt
+
+# Videos
+*.mp4
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment variables
+.env
