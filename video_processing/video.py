@@ -4,6 +4,7 @@ import easyocr
 from ultralytics import YOLO
 from collections import Counter
 import mysql.connector
+import time
 
 model = YOLO("best.pt")
 reader = easyocr.Reader(["ko", "en"], gpu=False)
@@ -20,7 +21,10 @@ def recognize_plate(plate):
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
     binary = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
+    start = time.perf_counter()
     ocr_result = reader.readtext(binary)
+    end = time.perf_counter()
+    print("OCR:", (end - start) * 1000, "ms")
 
     if len(ocr_result) == 0:
         return None, 0, binary
@@ -47,6 +51,7 @@ counter = Counter()
 final_plate = None
 gate_state = "WAITING"
 parking_state = "EMPTY"
+recognition_start = None
 
 
 while True:
@@ -57,7 +62,12 @@ while True:
 
     # 차단기 시스템
     if gate_state == "WAITING":
+
+        start = time.perf_counter()
         results = model(frame, conf=0.1, imgsz=1280, verbose=False)
+        end = time.perf_counter()
+        print("YOLO:", (end - start) * 1000, "ms")
+
         result = results[0]
 
         if len(result.boxes) > 0:
@@ -69,12 +79,20 @@ while True:
             text, ocr_conf, binary = recognize_plate(plate)
 
             if is_valid_plate(text, ocr_conf):
+                if recognition_start is None:
+                    recognition_start = time.perf_counter()
+
                 counter[text] += 1
                 print(text, "→", counter[text], "회")
 
                 if counter[text] >= 3:
                     final_plate = text
+
+                    recognition_end = time.perf_counter()
+                    recognition_time = recognition_end - recognition_start
+
                     print("최종 번호판:", final_plate)
+                    print(f"번호판 확정 시간: {recognition_time:.2f}초")
 
                     if is_registered_vehicle(final_plate):
                         print("등록 차량")
